@@ -2122,7 +2122,11 @@ mark: {
             jl_task_t *ta = (jl_task_t*)new_obj;
             gc_scrub_record_task(ta);
             int stkbuf = (ta->stkbuf != (void*)(intptr_t)-1 && ta->stkbuf != NULL);
+#ifdef JULIA_ENABLE_PARTR
+            int16_t tid = ta->curr_tid;
+#else
             int16_t tid = ta->tid;
+#endif
             jl_ptls_t ptls2 = jl_all_tls_states[tid];
             if (stkbuf) {
 #ifdef COPY_STACKS

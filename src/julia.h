@@ -1508,6 +1508,8 @@ typedef struct _jl_handler_t {
     size_t world_age;
 } jl_handler_t;
 
+#if !defined(JULIA_ENABLE_THREADING) || !defined(JULIA_ENABLE_PARTR)
+
 typedef struct _jl_task_t {
     JL_DATA_TYPE
     struct _jl_task_t *parent;
@@ -1546,6 +1548,119 @@ typedef struct _jl_task_t {
 #endif
     jl_timing_block_t *timing_stack;
 } jl_task_t;
+
+#endif // !JULIA_ENABLE_THREADING || ! JULIA_ENABLE_PARTR
+
+#if defined(JULIA_ENABLE_THREADING) && defined(JULIA_ENABLE_PARTR)
+/* task settings */
+#define TASK_IS_DETACHED        0x02
+    /* clean up the task on completion */
+#define TASK_IS_STICKY          0x04
+    /* task is sticky to the thread that first runs it */
+
+typedef struct _arriver_t arriver_t;
+typedef struct _reducer_t reducer_t;
+
+typedef struct _jl_taskq_t jl_taskq_t;
+typedef struct _jl_condition_t jl_condition_t;
+typedef struct _jl_task_t jl_task_t;
+
+struct _jl_taskq_t {
+    jl_task_t *head;
+    jl_mutex_t lock;
+};
+
+struct _jl_task_t {
+    JL_DATA_TYPE
+
+    /* task local storage */
+    jl_value_t *storage;
+
+    /* state */
+    jl_sym_t *state;
+
+    /* execution result */
+    jl_value_t *result;
+    jl_value_t *exception;
+    jl_value_t *backtrace;
+
+    /* to link this task into queues */
+    jl_task_t *next;
+
+    /* context and stack */
+    jl_jmp_buf ctx;
+    size_t ssize;
+    size_t bufsz;
+    void *stkbuf;
+
+    size_t started:1;
+
+    arraylist_t locks;
+
+    /* task entry point, arguments, result, etc. */
+    jl_value_t **args;
+    uint32_t nargs;
+    jl_method_instance_t *mfunc;
+    jl_generic_fptr_t fptr;
+
+    /* current exception handler */
+    jl_handler_t *eh;
+
+    /* saved gc stack top for context switches */
+    jl_gcframe_t *gcstack;
+
+    /* current module, or NULL if this task has not set one */
+    jl_module_t *current_module;
+
+    /* current world age */
+    size_t world_age;
+
+    /* thread currently running this task */
+    int16_t current_tid;
+
+    /* grain's range, for parfors */
+    int64_t start, end;
+
+    /* reduction function, for parfors */
+    jl_value_t **rargs;
+    uint32_t *nrargs;
+    jl_method_instance_t *mredfunc;
+    jl_generic_fptr_t rfptr;
+
+    /* parent (first) task of a parfor set */
+    jl_task_t *parent;
+
+    /* to synchronize/reduce grains of a parfor */
+    arriver_t *arr;
+    reducer_t *red;
+
+    /* parfor reduction result */
+    jl_value_t *red_result;
+
+    /* completion queue */
+    jl_taskq_t cq;
+
+    /* task settings */
+    int8_t  settings;
+
+    /* tid of the thread to which this task is sticky */
+    int16_t sticky_tid;
+
+    /* the index of this task in the set of grains of a parfor */
+    int16_t grain_num;
+
+    /* for the multiqueue */
+    int16_t prio;
+
+    jl_timing_block_t *timing_stack;
+};
+
+struct _jl_condition_t {
+    JL_DATA_TYPE
+
+    jl_taskq_t waitq;
+};
+#endif // JULIA_ENABLE_THREADING && JULIA_ENABLE_PARTR
 
 JL_DLLEXPORT jl_task_t *jl_new_task(jl_function_t *start, size_t ssize);
 JL_DLLEXPORT void jl_switchto(jl_task_t **pt);
