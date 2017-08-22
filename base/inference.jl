@@ -1898,6 +1898,7 @@ function abstract_call_gf_by_type(@nospecialize(f), argtypes::Vector{Any}, @nosp
     isa(ft, DataType) || return Any # the function being called is unknown. can't properly handle this backedge right now
     ftname = ft.name
     isdefined(ftname, :mt) || return Any # not callable. should be Bottom, but can't track this backedge right now
+    max_methods = sv.params.MAX_METHODS
     if ftname === _Type_name
         tname = ft.parameters[1]
         if isa(tname, TypeVar)
@@ -1909,6 +1910,10 @@ function abstract_call_gf_by_type(@nospecialize(f), argtypes::Vector{Any}, @nosp
             # for things like Union
             return Any
         end
+        # many types have many matching constructors; try harder to infer simple type ctors
+        if !has_free_typevars(tname)
+            max_methods = max(max_methods, 15)
+        end
     end
     min_valid = UInt[typemin(UInt)]
     max_valid = UInt[typemax(UInt)]
@@ -1917,12 +1922,12 @@ function abstract_call_gf_by_type(@nospecialize(f), argtypes::Vector{Any}, @nosp
         splitsigs = switchtupleunion(atype)
         applicable = Any[]
         for sig_n in splitsigs
-            xapplicable = _methods_by_ftype(sig_n, sv.params.MAX_METHODS, sv.params.world, min_valid, max_valid)
+            xapplicable = _methods_by_ftype(sig_n, max_methods, sv.params.world, min_valid, max_valid)
             xapplicable === false && return Any
             append!(applicable, xapplicable)
         end
     else
-        applicable = _methods_by_ftype(atype, sv.params.MAX_METHODS, sv.params.world, min_valid, max_valid)
+        applicable = _methods_by_ftype(atype, max_methods, sv.params.world, min_valid, max_valid)
         if applicable === false
             # this means too many methods matched
             # (assume this will always be true, so we don't compute / update valid age in this case)
