@@ -121,6 +121,7 @@ Core.tuple
 Base.ntuple
 Base.object_id
 Base.hash
+Base.hash_sub
 Base.finalizer
 Base.finalize
 Base.copy
