@@ -60,8 +60,10 @@ srand(rng::RandomDevice) = rng
 
 ## MersenneTwister
 
-const MT_CACHE_F = dsfmt_get_min_array_size()
-const MT_CACHE_I = 501 << 4
+const MT_CACHE_F = 501 << 1 # number of Float64 in the cache
+const MT_CACHE_I = 501 << 4 # number of bytes in the UInt128 cache
+
+@assert dsfmt_get_min_array_size() <= MT_CACHE_F
 
 mutable struct MersenneTwister <: AbstractRNG
     seed::Vector{UInt32}
@@ -72,7 +74,7 @@ mutable struct MersenneTwister <: AbstractRNG
     idxI::Int
 
     function MersenneTwister(seed, state, vals, ints, idxF, idxI)
-        length(vals) == MT_CACHE_F && 0 <= idxF <= MT_CACHE_F ||
+        length(vals) >= MT_CACHE_F && 0 <= idxF <= length(vals) ||
             throw(DomainError((length(vals), idxF),
                       "`length(vals)` and `idxF` must be consistent with $MT_CACHE_F"))
         length(ints) == MT_CACHE_I >> 4 && 0 <= idxI <= MT_CACHE_I ||
